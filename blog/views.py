@@ -26,22 +26,44 @@ def post_list(request):
     all_posts = Post.objects.all()
     return render(request, "Blog/post_list.html", {"all_posts": all_posts})
 
+class PostDetailView(DetailView):
+    model = Post
+    template_name = "Blog/post.html"
 
-def post_details(request, pk):
-    post = get_object_or_404(Post, pk=pk)
-    comments = post.comment_set.all()
-    if request.method == 'POST':
-        comment = request.POST.get('comm')
-        author = request.POST.get('username')
-        if comment != None and author != None:
-            if Author.objects.filter(name=author).exists():
-                Comment.objects.create(post=post, author=author, content=comment)
-            else:
-                author = Author.objects.create(name=author)
-                Comment.objects.create(post=post, author=author, content=comment)
-            return redirect('post_details', pk)
+    def get_context_data(self, **kwargs):
+        context = self.get_context_data(**kwargs)
+        post = self.get_object()
+        context["comment"] = post.comment_set.all()
+        return context
 
-    return render(request, "Blog/post.html", {"post": post, "comments": comments})
+    def post(self, request, *args, **kwargs):
+        post = self.get_object()
+        comment = request.POST.get("com")
+        author_name = request.POST.get("username")
+
+        if comment and author_name:
+            author = Author.objects.get_or_create(name=author_name)
+            Comment.objects.create(post=post, author=author, content=comment)
+            return redirect("post_details", post.pk)
+
+        return self.get(request, *args, **kwargs)
+
+
+# def post_details(request, pk):
+#     post = get_object_or_404(Post, pk=pk)
+#     comments = post.comment_set.all()
+#     if request.method == 'POST':
+#         comment = request.POST.get('comm')
+#         author = request.POST.get('username')
+#         if comment != None and author != None:
+#             if Author.objects.filter(name=author).exists():
+#                 Comment.objects.create(post=post, author=author, content=comment)
+#             else:
+#                 author = Author.objects.create(name=author)
+#                 Comment.objects.create(post=post, author=author, content=comment)
+#             return redirect('post_details', pk)
+
+#     return render(request, "Blog/post.html", {"post": post, "comments": comments})
 
 class CommentUpdateView(UpdateView):
     model = Comment
@@ -57,7 +79,7 @@ class CommentUpdateView(UpdateView):
         context['comment'] = self.object
         return context
     
-    
+
 # def comment_update(request, pk):
 #     comment = Comment.objects.get(id=pk)
 #     if request.method == "POST":
