@@ -1,8 +1,12 @@
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Post, Category, Comment
 from users.models import Author
-from .forms import PostForm
+from .forms import PostCreationForm, CommentUpdateForm, CommentCreationForm
+from django.http import HttpResponse
+from django.views.generic import DetailView, UpdateView
+from django.urls import reverse_lazy
 
 
 # Create your views here.
@@ -27,7 +31,7 @@ def post_details(request, pk):
     post = get_object_or_404(Post, pk=pk)
     comments = post.comment_set.all()
     if request.method == 'POST':
-        comment = request.POST.get('comment')
+        comment = request.POST.get('comm')
         author = request.POST.get('username')
         if comment != None and author != None:
             if Author.objects.filter(name=author).exists():
@@ -38,6 +42,37 @@ def post_details(request, pk):
             return redirect('post_details', pk)
 
     return render(request, "Blog/post.html", {"post": post, "comments": comments})
+
+class CommentUpdateView(UpdateView):
+    model = Comment
+    form_class = CommentUpdateForm
+    template_name = 'Blog/comment_update.html'
+
+    def form_valid(self, form):
+        super().form_valid(form)
+        return redirect('post_details', self.object.post.id)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['comment'] = self.object
+        return context
+    
+    
+# def comment_update(request, pk):
+#     comment = Comment.objects.get(id=pk)
+#     if request.method == "POST":
+#         form = CommentUpdateForm(request.POST)
+#         if form.is_valid():
+#             cd = form.cleaned_data
+#             comment.content = cd['content']
+#             comment.save()
+#             return redirect('post_details', comment.post.id)
+#     else:
+#         form = CommentUpdateForm(initial=
+#                                  {'content': comment.content}
+#                                  )
+
+#     return render(request, 'Blog/comment_update.html', {'form': form, 'comm': comment})
 
 
 def category_list(request):
@@ -53,33 +88,18 @@ def category_list(request):
 
 def category_details(request, pk):
     if request.method == 'POST':
-        category = get_object_or_404(Category, id=pk)
-        authors = Author.objects.all()
-        posts = getattr(category, "post_set").all()
+        form = PostCreationForm(request.POST)
+        if form.is_valid:
+            f = form.save(commit=False)
+            category = Category.objects.get(id=pk)
+            f.category = category
+            f.save()
 
-    if request.method == "POST":
-        form = PostForm(request.POST)
-        if form.is_valid():
-            post = form.save()
-            post.category = category
-            post.save()
-            comment_text = request.POST.get("comment")
-            if comment_text:
-                Comment.objects.create(post=post, content=comment_text)
-            return redirect("category_details", pk=pk)
+        return redirect('blog:category_details', pk)
     else:
+        form = PostCreationForm()
         category = Category.objects.get(id=pk)
         authors = Author.objects.all()
         posts = category.post_set.all()
     return render(request, "Blog/category_details.html",
-                  {"category": category, 'posts': posts, 'authors': authors})
-
-def update_post(request, id):
-    post = get_object_or_404(Post, pk=id)
-    if request.method == "POST":
-        content = request.POST.get("content")
-        Post.content = content
-        Post.save()
-        return redirect("post_details", id=id)
-    else:
-        return render(request, "post.html", {"post": post})
+                  {"category": category, 'posts': posts, 'authors': authors, 'form': form})
